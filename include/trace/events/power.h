@@ -845,6 +845,33 @@ TRACE_EVENT(sugov_util_update,
 		      __entry->pl, __entry->rtgb, __entry->flags)
 );
 
+#ifdef CONFIG_CONTROL_CENTER
+TRACE_EVENT(sugov_next_freq,
+	    TP_PROTO(unsigned int cpu, unsigned long util, unsigned long max,
+		     unsigned int freq, unsigned int req_freq),
+	    TP_ARGS(cpu, util, max, freq, req_freq),
+	    TP_STRUCT__entry(
+		    __field(unsigned int, cpu)
+		    __field(unsigned long, util)
+		    __field(unsigned long, max)
+		    __field(unsigned int, freq)
+		    __field(unsigned int, req_freq)
+	    ),
+	    TP_fast_assign(
+		    __entry->cpu = cpu;
+		    __entry->util = util;
+		    __entry->max = max;
+		    __entry->freq = freq;
+		    __entry->req_freq = req_freq;
+	    ),
+	    TP_printk("cpu=%u util=%lu max=%lu freq=%u req_freq=%u",
+		      __entry->cpu,
+		      __entry->util,
+		      __entry->max,
+		      __entry->freq,
+		      __entry->req_freq)
+);
+#else
 TRACE_EVENT(sugov_next_freq,
 	    TP_PROTO(unsigned int cpu, unsigned long util, unsigned long max,
 		     unsigned int freq),
@@ -867,6 +894,7 @@ TRACE_EVENT(sugov_next_freq,
 		      __entry->max,
 		      __entry->freq)
 );
+#endif
 
 #endif /* _TRACE_POWER_H */
 

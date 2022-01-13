@@ -272,6 +272,12 @@ static int fastrpc_pdr_notifier_cb(struct notifier_block *nb,
 static struct dentry *debugfs_root;
 static struct dentry *debugfs_global_file;
 
+static atomic_t total_buf_size;
+int read_fastrpc_usage(void)
+{
+	return atomic_read(&total_buf_size) / PAGE_SIZE;
+}
+
 static inline uint64_t buf_page_start(uint64_t buf)
 {
 	uint64_t start = (uint64_t) buf & PAGE_MASK;
@@ -1042,6 +1048,7 @@ skip_buf_cache:
 			}
 		}
 		trace_fastrpc_dma_free(fl->cid, buf->phys, buf->size);
+		atomic_sub(buf->size, &total_buf_size);
 		dma_free_attrs(fl->sctx->smmu.dev, buf->size, buf->virt,
 					buf->phys, buf->dma_attr);
 	}
@@ -1735,6 +1742,7 @@ static int fastrpc_buf_alloc(struct fastrpc_file *fl, size_t size,
 	buf->flags = rflags;
 	buf->raddr = 0;
 	buf->type = buf_type;
+	atomic_add(size, &total_buf_size);
 	ktime_get_real_ts64(&buf->buf_start_time);
 
 	buf->virt = dma_alloc_attrs(fl->sctx->smmu.dev, buf->size,

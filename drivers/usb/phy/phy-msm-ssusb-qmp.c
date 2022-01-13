@@ -75,6 +75,21 @@ enum core_ldo_levels {
 #define DP_MODE			BIT(1) /* enables DP mode */
 #define USB3_DP_COMBO_MODE	(USB3_MODE | DP_MODE) /*enables combo mode */
 
+unsigned int USB3_DP_PCS_G12S1_TXMGN_V0;
+module_param(USB3_DP_PCS_G12S1_TXMGN_V0, uint, 0644);
+MODULE_PARM_DESC(USB3_DP_PCS_G12S1_TXMGN_V0, "QUSB3 DP PHY TUNE1");
+
+unsigned int USB3_DP_PCS_G12S1_TXDEEMPH_M3P5DB;
+module_param(USB3_DP_PCS_G12S1_TXDEEMPH_M3P5DB, uint, 0644);
+MODULE_PARM_DESC(USB3_DP_PCS_G12S1_TXDEEMPH_M3P5DB, "QUSB3 DP PHY TUNE2");
+
+unsigned int USB3_UNI_PCS_G12S1_TXMGN_V0;
+module_param(USB3_UNI_PCS_G12S1_TXMGN_V0, uint, 0644);
+MODULE_PARM_DESC(USB3_UNI_PCS_G12S1_TXMGN_V0, "QUSB3 DP PHY TUNE1");
+
+unsigned int USB3_UNI_PCS_G12S1_TXDEEMPH_M3P5DB;
+module_param(USB3_UNI_PCS_G12S1_TXDEEMPH_M3P5DB, uint, 0644);
+MODULE_PARM_DESC(USB3_UNI_PCS_G12S1_TXDEEMPH_M3P5DB, "QUSB3 DP PHY TUNE2");
 /* USB3_DP_COM_TYPEC_STATUS */
 #define PORTSELECT_RAW		BIT(0)
 
@@ -484,6 +499,7 @@ static int msm_ssphy_qmp_init(struct usb_phy *uphy)
 	int ret;
 	unsigned int init_timeout_usec = INIT_MAX_TIME_USEC;
 	const struct qmp_reg_val *reg = NULL;
+	u8 USB3_reg1, USB3_reg2, USB3_reg3, USB3_reg4;
 
 	dev_dbg(uphy->dev, "Initializing QMP phy\n");
 

@@ -72,10 +72,11 @@ EXPORT_SYMBOL(__mutex_init);
  *
  * DO NOT USE (outside of mutex code).
  */
-static inline struct task_struct *__mutex_owner(struct mutex *lock)
+inline struct task_struct *__mutex_owner(struct mutex *lock)
 {
 	return (struct task_struct *)(atomic_long_read(&lock->owner) & ~MUTEX_FLAGS);
 }
+EXPORT_SYMBOL(__mutex_owner);
 
 static inline struct task_struct *__owner_task(unsigned long owner)
 {
@@ -1047,11 +1048,26 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 		}
 
 		spin_unlock(&lock->wait_lock);
+#ifdef CONFIG_ONEPLUS_HEALTHINFO
+/*2020-11-27, add for stuck monitor*/
+		if (state & TASK_UNINTERRUPTIBLE)
+			current->in_mutex = 1;
+#endif /*CONFIG_ONEPLUS_HEALTHINFO*/
 		schedule_preempt_disabled();
-
-		first = __mutex_waiter_is_first(lock, &waiter);
-		if (first)
-			__mutex_set_flag(lock, MUTEX_FLAG_HANDOFF);
+#ifdef CONFIG_ONEPLUS_HEALTHINFO
+/*2020-11-27, add for stuck monitor*/
+		if (state & TASK_UNINTERRUPTIBLE)
+			current->in_mutex = 0;
+#endif /*CONFIG_ONEPLUS_HEALTHINFO*/
+		/*
+		 * ww_mutex needs to always recheck its position since its waiter
+		 * list is not FIFO ordered.
+		 */
+		if ((use_ww_ctx && ww_ctx) || !first) {
+			first = __mutex_waiter_is_first(lock, &waiter);
+			if (first)
+				__mutex_set_flag(lock, MUTEX_FLAG_HANDOFF);
+		}
 
 		set_current_state(state);
 		/*

@@ -35,6 +35,9 @@
  * partners that do not support USB Power Delivery, this should still work.
  */
 #define UCSI_SWAP_TIMEOUT_MS	5000
+static bool usb_compliance_mode;
+module_param(usb_compliance_mode, bool, 0644);
+MODULE_PARM_DESC(usb_compliance_mode, "USB3.1 compliance testing");
 
 static int ucsi_acknowledge_command(struct ucsi *ucsi)
 {

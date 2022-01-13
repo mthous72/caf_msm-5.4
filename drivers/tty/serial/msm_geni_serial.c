@@ -25,8 +25,12 @@
 #include <linux/ioctl.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/dma-mapping.h>
+
+#include <linux/pinctrl/devinfo.h>
+
 #include <uapi/linux/msm_geni_serial.h>
 #include <soc/qcom/boot_stats.h>
+
 
 /* UART specific GENI registers */
 #define SE_UART_LOOPBACK_CFG		(0x22C)
@@ -264,6 +268,28 @@ static int uart_line_id;
 
 #define GET_DEV_PORT(uport) \
 	container_of(uport, struct msm_geni_serial_port, uport)
+
+#ifdef CONFIG_QGKI
+struct oemconsole {
+	bool default_console;
+	bool console_initialized;
+};
+
+static struct oemconsole oem_console  = {
+	.default_console       = false,
+	.console_initialized   = false,
+};
+
+static int __init parse_console_config(char *str)
+{	pr_err("%s: *akash\n", __func__);
+	if (str == NULL)
+		return 0;
+	if (!strcmp(str, "ttyMSM0,115200n8"))
+		oem_console.default_console = true;
+	return 0;
+}
+early_param("console", parse_console_config);
+#endif
 
 static struct msm_geni_serial_port msm_geni_console_port;
 static struct msm_geni_serial_port msm_geni_serial_ports[GENI_UART_NR_PORTS];
@@ -3389,6 +3415,13 @@ static int msm_geni_serial_probe(struct platform_device *pdev)
 	place_marker(boot_marker);
 
 	is_console = (drv->cons ? true : false);
+#ifdef CONFIG_QGKI
+	if (!oem_console.default_console && is_console) {
+		dev_err(&pdev->dev, "%s:return fake success\n", __func__);
+		devm_pinctrl_put(pdev->dev.pins->p);
+		return 0;
+	}
+#endif
 	dev_port = get_port_from_line(line, is_console);
 	if (IS_ERR_OR_NULL(dev_port)) {
 		ret = PTR_ERR(dev_port);
@@ -3492,6 +3525,8 @@ static int msm_geni_serial_probe(struct platform_device *pdev)
 	 */
 	if (dev_port->is_console)
 		geni_se_remove_earlycon_icc_vote(dev_port->wrapper_dev);
+    else
+        spin_lock_init(&dev_port->rx_lock);
 
 	if (strcmp(id->compatible, "qcom,msm-geni-console") == 0)
 		snprintf(boot_marker, sizeof(boot_marker),
@@ -3510,8 +3545,12 @@ exit_geni_serial_probe:
 static int msm_geni_serial_remove(struct platform_device *pdev)
 {
 	struct msm_geni_serial_port *port = platform_get_drvdata(pdev);
-	struct uart_driver *drv =
-			(struct uart_driver *)port->uport.private_data;
+	struct uart_driver *drv;
+
+	if (port == NULL)
+		return 0;
+
+	drv = (struct uart_driver *)port->uport.private_data;
 
 	if (!uart_console(&port->uport))
 		wakeup_source_unregister(port->geni_wake);
@@ -3662,7 +3701,7 @@ static int msm_geni_serial_sys_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct msm_geni_serial_port *port = platform_get_drvdata(pdev);
-	struct uart_port *uport = &port->uport;
+	struct uart_port *uport;
 
 	if (uart_console(uport) || port->pm_auto_suspend_disable) {
 		IPC_LOG_MSG(port->console_log, "%s start\n", __func__);
@@ -3693,7 +3732,7 @@ static int msm_geni_serial_sys_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct msm_geni_serial_port *port = platform_get_drvdata(pdev);
-	struct uart_port *uport = &port->uport;
+	struct uart_port *uport;
 
 	if ((uart_console(uport) &&
 	    console_suspend_enabled && uport->suspended) ||

@@ -4585,6 +4585,14 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 
 	sdhci_msm_set_regulator_caps(msm_host);
 
+	/*
+	 * Ensure larger discard size by setting max_busy_timeout.
+	 * This has to set only after sdhci_add_host so that our
+	 * value won't be over-written.
+	 */
+#ifndef CONFIG_ARCH_HOLI
+	host->mmc->max_busy_timeout = 0;
+#endif
 #if defined(CONFIG_SDC_QTI)
 	sdhci_msm_init_sysfs(pdev);
 #endif
