@@ -13,6 +13,7 @@
 #include <linux/sched/cpufreq.h>
 #include <trace/events/power.h>
 #include <linux/sched/sysctl.h>
+#include <trace/hooks/sched.h>
 
 #ifdef CONFIG_CONTROL_CENTER
 #include <oneplus/control_center/control_center_helper.h>
@@ -343,30 +344,15 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 	struct cpufreq_policy *policy = sg_policy->policy;
 	unsigned int freq = arch_scale_freq_invariant() ?
 				policy->cpuinfo.max_freq : policy->cur;
+	unsigned long next_freq = 0;
 
-#ifdef CONFIG_CONTROL_CENTER
-	unsigned int req_freq;
+	trace_android_vh_map_util_freq(util, freq, max, &next_freq);
+	if (next_freq)
+		freq = next_freq;
+	else
+		freq = map_util_freq(util, freq, max);
 
-	freq = map_util_freq(util, freq, max);
-
-	if (freq == sg_policy->cached_raw_freq &&
-	    !sg_policy->need_freq_update) {
-		req_freq = sg_policy->next_freq;
-		goto out;
-	}
-
-	sg_policy->need_freq_update = false;
-	sg_policy->cached_raw_freq = freq;
-	req_freq = cpufreq_driver_resolve_freq(policy, freq);
-out:
-	/* keep resolved freq */
-	sg_policy->policy->req_freq = req_freq;
-	trace_sugov_next_freq(policy->cpu, util, max, freq, req_freq);
-	return req_freq;
-#else
-	freq = map_util_freq(util, freq, max);
 	trace_sugov_next_freq(policy->cpu, util, max, freq);
-
 	if (freq == sg_policy->cached_raw_freq && !sg_policy->need_freq_update)
 		return sg_policy->next_freq;
 
@@ -403,7 +389,7 @@ unsigned long schedutil_cpu_util(int cpu, unsigned long util_cfs,
 	unsigned long dl_util, util, irq;
 	struct rq *rq = cpu_rq(cpu);
 
-	if (!IS_BUILTIN(CONFIG_UCLAMP_TASK) && sched_feat(SUGOV_RT_MAX_FREQ) &&
+	if (!uclamp_is_used() && sched_feat(SUGOV_RT_MAX_FREQ) &&
 	    type == FREQUENCY_UTIL && rt_rq_is_runnable(&rq->rt)) {
 		return max;
 	}
